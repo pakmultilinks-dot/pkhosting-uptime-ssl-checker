@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PKHosting - Website Uptime &amp; SSL Expiry Checker</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">PK<span>Hosting</span></div>
+    <div class="tagline">Website Uptime &amp; SSL Expiry Checker</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h1>Check your websites</h1>
+    <p class="lede">Paste website URLs below (one per line), or upload a CSV file. You get HTTP status,
+      response time and SSL certificate expiry for every site.</p>
+
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    <form action="/check" method="post" enctype="multipart/form-data">
+      <label for="urls">Website URLs</label>
+      <textarea id="urls" name="urls" rows="6"
+        placeholder="example.com&#10;https://myshop.pk&#10;blog.example.org"></textarea>
+
+      <div class="row">
+        <div>
+          <label for="csv_file">Or upload a CSV file</label>
+          <input type="file" id="csv_file" name="csv_file" accept=".csv">
+        </div>
+        <div>
+          <label for="timeout">Timeout (seconds)</label>
+          <input type="number" id="timeout" name="timeout" value="10" min="3" max="60">
+        </div>
+      </div>
+
+      <button type="submit" class="btn">Run checks</button>
+    </form>
+  </section>
+
+  {% if invalid %}
+  <section class="card">
+    <h2>Skipped entries</h2>
+    <p class="lede">These entries did not look like website addresses and were not checked.</p>
+    <ul class="skipped">
+      {% for item in invalid %}
+      <li><code>{{ item.entry }}</code> - {{ item.error }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if results %}
+  <section class="card">
+    <div class="results-head">
+      <h2>Results ({{ results|length }})</h2>
+      <form action="/download" method="post">
+        <input type="hidden" name="payload" value='{{ payload|e }}'>
+        <button type="submit" class="btn secondary">Download CSV report</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Website</th>
+            <th>Status</th>
+            <th>HTTP</th>
+            <th>Response</th>
+            <th>SSL expires</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr class="{% if r.error and not r.ok %}down{% elif r.ssl_warning %}warn{% elif r.ok %}up{% else %}down{% endif %}">
+            <td class="url">{{ r.url }}</td>
+            <td>
+              {% if r.ok and not r.ssl_warning %}
+                <span class="pill up">Up</span>
+              {% elif r.ok and r.ssl_warning %}
+                <span class="pill warn">SSL expiring</span>
+              {% else %}
+                <span class="pill down">Down</span>
+              {% endif %}
+            </td>
+            <td>{{ r.status if r.status is not none else "-" }}</td>
+            <td>{{ r.response_ms ~ " ms" if r.response_ms is not none else "-" }}</td>
+            <td>
+              {% if r.ssl_expiry %}
+                {{ r.ssl_expiry }} ({{ r.ssl_days_left }}d)
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td class="note">{{ r.error or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="legend">
+      <span class="pill up">Up</span> site answered &nbsp;
+      <span class="pill warn">SSL expiring</span> certificate expires within 30 days &nbsp;
+      <span class="pill down">Down</span> unreachable or HTTP error
+    </p>
+  </section>
+  {% endif %}
+</main>
+
+<footer class="wrap foot">
+  Built for PKHosting.com - shared hosting, domains and services for local businesses.
+</footer>
+</body>
+</html>
